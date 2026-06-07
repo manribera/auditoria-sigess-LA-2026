@@ -339,7 +339,7 @@ def comparar_libros(df_base, df_final):
                 })
 
     return no_localizados, incorporados, pd.DataFrame(variaciones)
-    # =====================================================
+# =====================================================
 # REPORTE EXCEL
 # =====================================================
 
@@ -743,6 +743,8 @@ with col2:
         type=["xlsx", "xlsm"],
         key=f"final_{st.session_state['uploader_version']}"
     )
+    
+ejecutar = st.button("🚀 Ejecutar Seguimiento Comparativo", type="primary")
 
 # =====================================================
 # EJECUCIÓN
