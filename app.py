@@ -721,6 +721,10 @@ def generar_pdf_seguimiento(
 # =====================================================
 # INTERFAZ DE CARGA
 # =====================================================
+if st.button("Limpiar archivos cargados"):
+    st.session_state["base"] = None
+    st.session_state["final"] = None
+    st.rerun()
 
 col1, col2 = st.columns(2)
 
