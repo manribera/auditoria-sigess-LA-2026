@@ -593,11 +593,9 @@ def generar_pdf_seguimiento(
     agregar_titulo_seccion(pdf, "8. Fuente")
     agregar_parrafo(pdf, datos_pdf["fuente_pdf"])
 
-    pdf_bytes = pdf.output(dest="S")
-    if isinstance(pdf_bytes, str):
-        pdf_bytes = pdf_bytes.encode("latin-1")
+  pdf_bytes = bytes(pdf.output(dest="S"))
 
-    return pdf_bytes
+return pdf_bytes
 
 
 # =====================================================
