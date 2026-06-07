@@ -181,15 +181,11 @@ def extraer_planificacion_sigess(archivo):
     )
 
     delegacion = limpiar_texto(df.iloc[2, 7]) if df.shape[0] > 2 and df.shape[1] > 7 else ""
-    def nombre_archivo_seguro(texto):
+def nombre_archivo_seguro(texto):
     texto = limpiar_texto(texto)
     texto = re.sub(r"[^\w\s-]", "", texto)
     texto = re.sub(r"\s+", "_", texto)
     return texto.upper() if texto else "DELEGACION"
-    delegacion_reporte = "DELEGACION"
-
-if not df_final.empty and "Delegación Policial" in df_final.columns:
-    delegacion_reporte = nombre_archivo_seguro(df_final["Delegación Policial"].iloc[0])
 
     for i in range(len(df)):
         fila = df.iloc[i]
@@ -738,6 +734,12 @@ if ejecutar:
     try:
         df_base = extraer_planificacion_sigess(archivo_base)
         df_final = extraer_planificacion_sigess(archivo_final)
+        delegacion_reporte = "DELEGACION"
+
+if not df_final.empty and "Delegación Policial" in df_final.columns:
+    delegacion_reporte = nombre_archivo_seguro(
+        df_final["Delegación Policial"].iloc[0]
+    )
 
         if df_base.empty:
             st.error("No se extrajo información válida del Libro Base 2025.")
@@ -842,7 +844,7 @@ if ejecutar:
             st.download_button(
                 label="📥 Descargar reporte Excel",
                 data=reporte_excel,
-                file_name="REPORTE_SEGUIMIENTO_COMPARATIVO_SIGESS_2026.xlsx",
+               file_name=f"REPORTE_SEGUIMIENTO_{delegacion_reporte}_2026.xlsx"
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
@@ -850,7 +852,7 @@ if ejecutar:
             st.download_button(
                 label="📄 Descargar reporte PDF",
                 data=reporte_pdf,
-                file_name="INFORME_VALIDACION_DE_LINEAS_INDICADORES_2026.pdf",
+               file_name=f"INFORME_SEGUIMIENTO_{delegacion_reporte}_2026.pdf"
                 mime="application/pdf"
             )
 
