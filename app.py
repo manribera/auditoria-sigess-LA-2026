@@ -9,7 +9,13 @@ st.set_page_config(
     layout="wide"
 )
 
-st.title("🔍 Auditoría de Libros SIGESS 2026")
+col_logo, col_titulo = st.columns([1, 6])
+
+with col_logo:
+    st.image("man.png", width=90)
+
+with col_titulo:
+    st.title("Auditoría de Libros SIGESS 2026")
 st.write(
     "Compara un **Libro Base/Original** contra un **Libro Final 2026** "
     "detectando líneas, indicadores y metas eliminadas, nuevas o modificadas."
