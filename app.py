@@ -472,6 +472,16 @@ def generar_pdf_seguimiento(
     pdf = PDFSeguimiento()
     pdf.set_auto_page_break(auto=True, margin=18)
 
+    total_no_localizados = int(resumen["Registros no localizados"].iloc[0])
+    total_incorporados = int(resumen["Registros incorporados"].iloc[0])
+    total_variaciones = int(resumen["Registros con variaciones"].iloc[0])
+
+    informe_simplificado = (
+        total_no_localizados == 0
+        and total_incorporados == 0
+        and total_variaciones == 0
+    )
+
     # =====================================================
     # PORTADA
     # =====================================================
@@ -541,89 +551,144 @@ def generar_pdf_seguimiento(
     total_base = int(resumen["Total registros Libro Base 2025"].iloc[0])
     total_final = int(resumen["Total registros Informe Evaluado 2026"].iloc[0])
     total_coincidentes = int(resumen["Registros coincidentes"].iloc[0])
-    total_no_localizados = int(resumen["Registros no localizados"].iloc[0])
-    total_incorporados = int(resumen["Registros incorporados"].iloc[0])
-    total_variaciones = int(resumen["Registros con variaciones"].iloc[0])
 
-    texto_resumen = (
-        f"Se procesaron {total_base} registros del Libro Base 2025 y "
-        f"{total_final} registros del Informe Trimestral de Avance 2026. "
-        f"Como resultado, se identificaron {total_coincidentes} registros coincidentes, "
-        f"{total_no_localizados} registros no localizados en el instrumento evaluado, "
-        f"{total_incorporados} registros incorporados y "
-        f"{total_variaciones} registros con variaciones en campos clave."
-    )
+    if informe_simplificado:
+        texto_resumen = (
+            f"Se procesaron {total_base} registros del Libro Base 2025 y "
+            f"{total_final} registros del Informe Trimestral de Avance 2026. "
+            f"El seguimiento comparativo no identificó registros no localizados, "
+            f"registros incorporados ni variaciones en los campos clave evaluados. "
+            f"En consecuencia, los {total_coincidentes} registros comparados mantienen "
+            f"correspondencia metodológica entre ambos instrumentos."
+        )
+    else:
+        texto_resumen = (
+            f"Se procesaron {total_base} registros del Libro Base 2025 y "
+            f"{total_final} registros del Informe Trimestral de Avance 2026. "
+            f"Como resultado, se identificaron {total_coincidentes} registros coincidentes, "
+            f"{total_no_localizados} registros no localizados en el instrumento evaluado, "
+            f"{total_incorporados} registros incorporados y "
+            f"{total_variaciones} registros con variaciones en campos clave."
+        )
 
     agregar_parrafo(pdf, texto_resumen)
     agregar_resumen_en_pdf(pdf, resumen)
 
     # =====================================================
-    # NO LOCALIZADOS
+    # SI NO HAY DIFERENCIAS, PDF SIMPLIFICADO
+    # =====================================================
+    if informe_simplificado:
+        pdf.add_page()
+        agregar_titulo_seccion(pdf, "4. Resultado del seguimiento comparativo")
+        agregar_parrafo(
+            pdf,
+            "Con base en la información extraída de ambos instrumentos, no se observaron "
+            "diferencias en las líneas de acción, indicadores, metas y campos clave evaluados. "
+            "El Informe Trimestral de Avance 2026 mantiene correspondencia con el Libro Base "
+            "2025 utilizado como referencia metodológica."
+        )
+
+        agregar_titulo_seccion(pdf, "5. Valoración técnica")
+        agregar_parrafo(
+            pdf,
+            "El resultado obtenido permite considerar que, para los campos evaluados por la "
+            "herramienta, ambos instrumentos reúnen las mismas condiciones de estructura y lógica "
+            "metodológica. Esta valoración se limita al alcance comparativo definido y constituye "
+            "un insumo de seguimiento técnico."
+        )
+
+        agregar_titulo_seccion(pdf, "6. Fuente")
+        agregar_parrafo(pdf, datos_pdf["fuente_pdf"])
+
+    else:
+        # =====================================================
+        # NO LOCALIZADOS
+        # =====================================================
+        pdf.add_page()
+        agregar_titulo_seccion(pdf, "4. Registros del Libro Base no localizados")
+        agregar_parrafo(
+            pdf,
+            "Esta sección muestra registros presentes en el Libro Base 2025 que no fueron localizados "
+            "en el Informe Trimestral de Avance evaluado."
+        )
+        agregar_tabla_simple(
+            pdf,
+            no_localizados,
+            ["Número de Línea", "Indicador", "Meta"],
+            max_filas=15
+        )
+
+        # =====================================================
+        # INCORPORADOS
+        # =====================================================
+        pdf.add_page()
+        agregar_titulo_seccion(pdf, "5. Registros incorporados en el instrumento evaluado")
+        agregar_parrafo(
+            pdf,
+            "Esta sección muestra registros presentes en el Informe Trimestral de Avance 2026 "
+            "que no se encontraban en el Libro Base 2025 utilizado como referencia."
+        )
+        agregar_tabla_simple(
+            pdf,
+            incorporados,
+            ["Número de Línea", "Indicador", "Meta"],
+            max_filas=15
+        )
+
+        # =====================================================
+        # VARIACIONES
+        # =====================================================
+        pdf.add_page()
+        agregar_titulo_seccion(pdf, "6. Variaciones identificadas")
+        agregar_parrafo(
+            pdf,
+            "Esta sección muestra diferencias observadas en campos clave de registros localizados "
+            "en ambos instrumentos."
+        )
+        agregar_tabla_simple(
+            pdf,
+            variaciones,
+            [
+                "ID_REGISTRO",
+                "Campo con variación",
+                "Valor Libro Base 2025",
+                "Valor Informe Evaluado 2026"
+            ],
+            max_filas=15
+        )
+
+        # =====================================================
+        # VALORACIÓN TÉCNICA
+        # =====================================================
+        pdf.add_page()
+        agregar_titulo_seccion(pdf, "7. Valoración técnica")
+        agregar_parrafo(pdf, datos_pdf["texto_valoracion"])
+
+        agregar_titulo_seccion(pdf, "8. Fuente")
+        agregar_parrafo(pdf, datos_pdf["fuente_pdf"])
+
+    # =====================================================
+    # PÁGINA DE CIERRE
     # =====================================================
     pdf.add_page()
-    agregar_titulo_seccion(pdf, "4. Registros del Libro Base no localizados")
-    agregar_parrafo(
-        pdf,
-        "Esta sección muestra registros presentes en el Libro Base 2025 que no fueron localizados "
-        "en el Informe Trimestral de Avance evaluado."
-    )
-    agregar_tabla_simple(
-        pdf,
-        no_localizados,
-        ["Número de Línea", "Indicador", "Meta"],
-        max_filas=15
+    pdf.ln(55)
+
+    try:
+        pdf.image("logo.png", x=70, y=80, w=70)
+    except Exception:
+        pass
+
+    pdf.ln(90)
+
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(11, 61, 78)
+    pdf.multi_cell(
+        0,
+        9,
+        "Coordinación Nacional\nEstrategia Sembremos Seguridad 2026",
+        align="C"
     )
 
-    # =====================================================
-    # INCORPORADOS
-    # =====================================================
-    pdf.add_page()
-    agregar_titulo_seccion(pdf, "5. Registros incorporados en el instrumento evaluado")
-    agregar_parrafo(
-        pdf,
-        "Esta sección muestra registros presentes en el Informe Trimestral de Avance 2026 "
-        "que no se encontraban en el Libro Base 2025 utilizado como referencia."
-    )
-    agregar_tabla_simple(
-        pdf,
-        incorporados,
-        ["Número de Línea", "Indicador", "Meta"],
-        max_filas=15
-    )
-
-    # =====================================================
-    # VARIACIONES
-    # =====================================================
-    pdf.add_page()
-    agregar_titulo_seccion(pdf, "6. Variaciones identificadas")
-    agregar_parrafo(
-        pdf,
-        "Esta sección muestra diferencias observadas en campos clave de registros localizados "
-        "en ambos instrumentos."
-    )
-    agregar_tabla_simple(
-        pdf,
-        variaciones,
-        [
-            "ID_REGISTRO",
-            "Campo con variación",
-            "Valor Libro Base 2025",
-            "Valor Informe Evaluado 2026"
-        ],
-        max_filas=15
-    )
-
-    # =====================================================
-    # VALORACIÓN TÉCNICA
-    # =====================================================
-    pdf.add_page()
-    agregar_titulo_seccion(pdf, "7. Valoración técnica")
-    agregar_parrafo(pdf, datos_pdf["texto_valoracion"])
-
-    agregar_titulo_seccion(pdf, "8. Fuente")
-    agregar_parrafo(pdf, datos_pdf["fuente_pdf"])
-
-    # Corrección para Streamlit Cloud
     pdf_bytes = bytes(pdf.output(dest="S"))
     return pdf_bytes
 
