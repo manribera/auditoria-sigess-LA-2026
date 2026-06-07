@@ -6,10 +6,6 @@ import unicodedata
 from datetime import date
 from fpdf import FPDF
 
-# =====================================================
-# CONFIGURACIÓN GENERAL
-# =====================================================
-
 st.set_page_config(
     page_title="Seguimiento SIGESS 2026",
     layout="wide"
@@ -17,7 +13,6 @@ st.set_page_config(
 
 HOJA_SIGESS = "Informe de avance"
 COLUMNA_CLAVE = "ID_REGISTRO"
-
 
 # =====================================================
 # ENCABEZADO
@@ -40,9 +35,8 @@ st.write(
     "considerando líneas de acción, indicadores, metas y campos clave."
 )
 
-
 # =====================================================
-# PANEL EDITABLE DEL INFORME PDF
+# PANEL EDITABLE
 # =====================================================
 
 with st.sidebar:
@@ -124,7 +118,6 @@ datos_pdf = {
     "fuente_pdf": fuente_pdf,
 }
 
-
 # =====================================================
 # FUNCIONES DE LIMPIEZA
 # =====================================================
@@ -168,7 +161,6 @@ def crear_id_registro(delegacion, numero_linea, numero_indicador):
     delegacion = re.sub(r"[^A-Za-z0-9_ÁÉÍÓÚáéíóúÑñ]", "", delegacion)
     return f"{delegacion}_L{numero_linea}_I{numero_indicador}"
 
-
 # =====================================================
 # EXTRACCIÓN SIGESS
 # =====================================================
@@ -205,8 +197,10 @@ def extraer_planificacion_sigess(archivo):
             fila_inicio_indicadores = i + 4
 
             fila_fin_bloque = len(df)
+
             for k in range(i + 1, len(df)):
                 posible_siguiente = limpiar_texto(df.iloc[k, 3]) if df.shape[1] > 3 else ""
+
                 if quitar_tildes(posible_siguiente).startswith("linea de accion"):
                     fila_fin_bloque = k
                     break
@@ -258,7 +252,6 @@ def extraer_planificacion_sigess(archivo):
                 numero_indicador_real += 1
 
     return pd.DataFrame(resultados)
-
 
 # =====================================================
 # COMPARACIÓN
@@ -313,12 +306,8 @@ def comparar_libros(df_base, df_final):
                     "Valor Informe Evaluado 2026": valor_final
                 })
 
-    df_variaciones = pd.DataFrame(variaciones)
-
-    return no_localizados, incorporados, df_variaciones
-
-
-# =====================================================
+    return no_localizados, incorporados, pd.DataFrame(variaciones)
+    # =====================================================
 # REPORTE EXCEL
 # =====================================================
 
@@ -342,27 +331,25 @@ def generar_excel_reporte(df_base, df_final, no_localizados, incorporados, varia
             "border": 1
         })
 
-        for sheet_name in writer.sheets:
-            worksheet = writer.sheets[sheet_name]
-            worksheet.freeze_panes(1, 0)
-            worksheet.autofilter(0, 0, 0, 10)
-
-            for col_num, value in enumerate(writer.sheets[sheet_name].table.columns if False else []):
-                pass
-
-        for nombre_hoja, dataframe in {
+        hojas = {
             "RESUMEN": resumen,
             "BASE_2025_EXTRAIDA": df_base,
             "INFORME_2026_EXTRAIDO": df_final,
             "NO_LOCALIZADOS": no_localizados,
             "INCORPORADOS": incorporados,
             "VARIACIONES": variaciones,
-        }.items():
+        }
+
+        for nombre_hoja, dataframe in hojas.items():
             ws = writer.sheets[nombre_hoja]
+            ws.freeze_panes(1, 0)
+
+            if not dataframe.empty:
+                ws.autofilter(0, 0, len(dataframe), len(dataframe.columns) - 1)
 
             for col_num, value in enumerate(dataframe.columns.values):
                 ws.write(0, col_num, value, formato_header)
-                ws.set_column(col_num, col_num, 25)
+                ws.set_column(col_num, col_num, 28)
 
     return output.getvalue()
 
@@ -373,10 +360,9 @@ def generar_excel_reporte(df_base, df_final, no_localizados, incorporados, varia
 
 class PDFSeguimiento(FPDF):
     def header(self):
-        self.set_font("Helvetica", "B", 9)
-        self.set_text_color(80, 80, 80)
-        self.cell(0, 8, "Seguimiento Comparativo SIGESS 2026", align="R", ln=True)
-        self.ln(3)
+        self.set_fill_color(11, 61, 78)
+        self.rect(0, 0, 210, 14, "F")
+        self.set_y(16)
 
     def footer(self):
         self.set_y(-15)
@@ -387,6 +373,7 @@ class PDFSeguimiento(FPDF):
 
 def limpiar_pdf(texto):
     texto = limpiar_texto(texto)
+
     reemplazos = {
         "–": "-",
         "—": "-",
@@ -395,6 +382,12 @@ def limpiar_pdf(texto):
         "‘": "'",
         "’": "'",
         "•": "-",
+        "á": "á",
+        "é": "é",
+        "í": "í",
+        "ó": "ó",
+        "ú": "ú",
+        "ñ": "ñ",
     }
 
     for viejo, nuevo in reemplazos.items():
@@ -405,7 +398,7 @@ def limpiar_pdf(texto):
 
 def agregar_titulo_seccion(pdf, titulo):
     pdf.set_font("Helvetica", "B", 14)
-    pdf.set_text_color(31, 78, 121)
+    pdf.set_text_color(11, 61, 78)
     pdf.multi_cell(0, 8, limpiar_pdf(titulo))
     pdf.ln(3)
 
@@ -418,31 +411,33 @@ def agregar_parrafo(pdf, texto):
 
 
 def agregar_tabla_simple(pdf, df, columnas, max_filas=12):
-    if df.empty:
+    columnas_existentes = [c for c in columnas if c in df.columns]
+
+    if df.empty or not columnas_existentes:
         pdf.set_font("Helvetica", "I", 10)
         pdf.set_text_color(80, 80, 80)
         pdf.cell(0, 8, "No se registran datos en esta sección.", ln=True)
         pdf.ln(4)
         return
 
-    df_mostrar = df[columnas].head(max_filas).copy()
-
-    pdf.set_font("Helvetica", "B", 8)
-    pdf.set_fill_color(31, 78, 121)
-    pdf.set_text_color(255, 255, 255)
+    df_mostrar = df[columnas_existentes].head(max_filas).copy()
 
     ancho_total = 190
-    ancho_col = ancho_total / len(columnas)
+    ancho_col = ancho_total / len(columnas_existentes)
 
-    for col in columnas:
-        pdf.cell(ancho_col, 7, limpiar_pdf(str(col))[:25], border=1, fill=True)
+    pdf.set_font("Helvetica", "B", 7)
+    pdf.set_fill_color(11, 61, 78)
+    pdf.set_text_color(255, 255, 255)
+
+    for col in columnas_existentes:
+        pdf.cell(ancho_col, 7, limpiar_pdf(str(col))[:24], border=1, fill=True)
     pdf.ln()
 
     pdf.set_font("Helvetica", "", 7)
     pdf.set_text_color(40, 40, 40)
 
     for _, row in df_mostrar.iterrows():
-        for col in columnas:
+        for col in columnas_existentes:
             valor = limpiar_pdf(row.get(col, ""))
             pdf.cell(ancho_col, 7, valor[:35], border=1)
         pdf.ln()
@@ -450,9 +445,19 @@ def agregar_tabla_simple(pdf, df, columnas, max_filas=12):
     if len(df) > max_filas:
         pdf.ln(2)
         pdf.set_font("Helvetica", "I", 8)
-        pdf.cell(0, 6, f"Se muestran {max_filas} registros de {len(df)}. Ver detalle completo en el Excel anexo.", ln=True)
+        pdf.cell(
+            0,
+            6,
+            f"Se muestran {max_filas} registros de {len(df)}. Ver detalle completo en el Excel anexo.",
+            ln=True
+        )
 
     pdf.ln(5)
+
+
+def agregar_resumen_en_pdf(pdf, resumen):
+    columnas = list(resumen.columns)
+    agregar_tabla_simple(pdf, resumen, columnas, max_filas=5)
 
 
 def generar_pdf_seguimiento(
@@ -467,18 +472,27 @@ def generar_pdf_seguimiento(
     pdf = PDFSeguimiento()
     pdf.set_auto_page_break(auto=True, margin=18)
 
-    # Portada
+    # =====================================================
+    # PORTADA
+    # =====================================================
     pdf.add_page()
-    pdf.ln(25)
+    pdf.ln(18)
 
-    pdf.set_font("Helvetica", "B", 20)
-    pdf.set_text_color(31, 78, 121)
+    try:
+        pdf.image("logo.png", x=80, y=30, w=50)
+        pdf.ln(55)
+    except Exception:
+        pdf.ln(25)
+
+    pdf.set_font("Helvetica", "B", 19)
+    pdf.set_text_color(11, 61, 78)
     pdf.multi_cell(0, 10, limpiar_pdf(datos_pdf["titulo_pdf"]), align="C")
 
-    pdf.ln(5)
-    pdf.set_font("Helvetica", "", 12)
+    pdf.ln(4)
+
+    pdf.set_font("Helvetica", "", 11)
     pdf.set_text_color(70, 70, 70)
-    pdf.multi_cell(0, 8, limpiar_pdf(datos_pdf["subtitulo_pdf"]), align="C")
+    pdf.multi_cell(0, 7, limpiar_pdf(datos_pdf["subtitulo_pdf"]), align="C")
 
     pdf.ln(18)
 
@@ -487,23 +501,30 @@ def generar_pdf_seguimiento(
         delegacion = limpiar_texto(df_final["Delegación Policial"].iloc[0])
 
     pdf.set_font("Helvetica", "", 11)
+    pdf.set_text_color(40, 40, 40)
     pdf.cell(0, 8, f"Delegación: {limpiar_pdf(delegacion)}", ln=True)
     pdf.cell(0, 8, f"Fecha de emisión: {datos_pdf['fecha_emision']}", ln=True)
     pdf.cell(0, 8, f"Realizado por: {limpiar_pdf(datos_pdf['elaborado_por'])}", ln=True)
 
     pdf.ln(20)
+
     pdf.set_font("Helvetica", "I", 10)
+    pdf.set_fill_color(235, 242, 245)
     pdf.multi_cell(
         0,
-        6,
+        7,
         limpiar_pdf(
             "Documento técnico generado para apoyar el seguimiento comparativo "
             "de la estructura de líneas de coordinación estratégica."
         ),
-        align="C"
+        border=1,
+        align="C",
+        fill=True
     )
 
-    # Objeto y alcance
+    # =====================================================
+    # OBJETO Y ALCANCE
+    # =====================================================
     pdf.add_page()
     agregar_titulo_seccion(pdf, "1. Objeto del análisis")
     agregar_parrafo(pdf, datos_pdf["objeto_analisis"])
@@ -511,13 +532,15 @@ def generar_pdf_seguimiento(
     agregar_titulo_seccion(pdf, "2. Alcance metodológico")
     agregar_parrafo(pdf, datos_pdf["alcance_metodologico"])
 
-    # Resumen
+    # =====================================================
+    # RESUMEN EJECUTIVO
+    # =====================================================
     pdf.add_page()
     agregar_titulo_seccion(pdf, "3. Resumen ejecutivo")
 
     total_base = int(resumen["Total registros Libro Base 2025"].iloc[0])
     total_final = int(resumen["Total registros Informe Evaluado 2026"].iloc[0])
-    total_iguales = int(resumen["Registros coincidentes"].iloc[0])
+    total_coincidentes = int(resumen["Registros coincidentes"].iloc[0])
     total_no_localizados = int(resumen["Registros no localizados"].iloc[0])
     total_incorporados = int(resumen["Registros incorporados"].iloc[0])
     total_variaciones = int(resumen["Registros con variaciones"].iloc[0])
@@ -525,22 +548,18 @@ def generar_pdf_seguimiento(
     texto_resumen = (
         f"Se procesaron {total_base} registros del Libro Base 2025 y "
         f"{total_final} registros del Informe Trimestral de Avance 2026. "
-        f"Como resultado, se identificaron {total_iguales} registros coincidentes, "
+        f"Como resultado, se identificaron {total_coincidentes} registros coincidentes, "
         f"{total_no_localizados} registros no localizados en el instrumento evaluado, "
         f"{total_incorporados} registros incorporados y "
         f"{total_variaciones} registros con variaciones en campos clave."
     )
 
     agregar_parrafo(pdf, texto_resumen)
+    agregar_resumen_en_pdf(pdf, resumen)
 
-    agregar_tabla_simple(
-        pdf,
-        resumen,
-        list(resumen.columns),
-        max_filas=5
-    )
-
-    # No localizados
+    # =====================================================
+    # NO LOCALIZADOS
+    # =====================================================
     pdf.add_page()
     agregar_titulo_seccion(pdf, "4. Registros del Libro Base no localizados")
     agregar_parrafo(
@@ -555,7 +574,9 @@ def generar_pdf_seguimiento(
         max_filas=15
     )
 
-    # Incorporados
+    # =====================================================
+    # INCORPORADOS
+    # =====================================================
     pdf.add_page()
     agregar_titulo_seccion(pdf, "5. Registros incorporados en el instrumento evaluado")
     agregar_parrafo(
@@ -570,7 +591,9 @@ def generar_pdf_seguimiento(
         max_filas=15
     )
 
-    # Variaciones
+    # =====================================================
+    # VARIACIONES
+    # =====================================================
     pdf.add_page()
     agregar_titulo_seccion(pdf, "6. Variaciones identificadas")
     agregar_parrafo(
@@ -581,11 +604,18 @@ def generar_pdf_seguimiento(
     agregar_tabla_simple(
         pdf,
         variaciones,
-        ["ID_REGISTRO", "Campo con variación", "Valor Libro Base 2025", "Valor Informe Evaluado 2026"],
+        [
+            "ID_REGISTRO",
+            "Campo con variación",
+            "Valor Libro Base 2025",
+            "Valor Informe Evaluado 2026"
+        ],
         max_filas=15
     )
 
-    # Valoración técnica
+    # =====================================================
+    # VALORACIÓN TÉCNICA
+    # =====================================================
     pdf.add_page()
     agregar_titulo_seccion(pdf, "7. Valoración técnica")
     agregar_parrafo(pdf, datos_pdf["texto_valoracion"])
@@ -593,9 +623,9 @@ def generar_pdf_seguimiento(
     agregar_titulo_seccion(pdf, "8. Fuente")
     agregar_parrafo(pdf, datos_pdf["fuente_pdf"])
 
-  pdf_bytes = bytes(pdf.output(dest="S"))
-
-return pdf_bytes
+    # Corrección para Streamlit Cloud
+    pdf_bytes = bytes(pdf.output(dest="S"))
+    return pdf_bytes
 
 
 # =====================================================
