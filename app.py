@@ -6,6 +6,10 @@ import unicodedata
 from datetime import date
 from fpdf import FPDF
 
+# =====================================================
+# CONFIGURACIÓN GENERAL
+# =====================================================
+
 st.set_page_config(
     page_title="Seguimiento SIGESS 2026",
     layout="wide"
@@ -13,6 +17,7 @@ st.set_page_config(
 
 HOJA_SIGESS = "Informe de avance"
 COLUMNA_CLAVE = "ID_REGISTRO"
+
 
 # =====================================================
 # ENCABEZADO
@@ -35,8 +40,9 @@ st.write(
     "considerando líneas de acción, indicadores, metas y campos clave."
 )
 
+
 # =====================================================
-# PANEL EDITABLE
+# PANEL EDITABLE DEL INFORME
 # =====================================================
 
 with st.sidebar:
@@ -118,8 +124,9 @@ datos_pdf = {
     "fuente_pdf": fuente_pdf,
 }
 
+
 # =====================================================
-# FUNCIONES DE LIMPIEZA
+# FUNCIONES DE LIMPIEZA Y APOYO
 # =====================================================
 
 def limpiar_texto(valor):
@@ -151,15 +158,26 @@ def normalizar_lider(valor):
 def extraer_numero_linea(texto):
     texto = limpiar_texto(texto)
     match = re.search(r"#\s*(\d+)", texto)
+
     if match:
         return int(match.group(1))
+
     return ""
 
 
 def crear_id_registro(delegacion, numero_linea, numero_indicador):
     delegacion = re.sub(r"\s+", "_", limpiar_texto(delegacion))
     delegacion = re.sub(r"[^A-Za-z0-9_ÁÉÍÓÚáéíóúÑñ]", "", delegacion)
+
     return f"{delegacion}_L{numero_linea}_I{numero_indicador}"
+
+
+def nombre_archivo_seguro(texto):
+    texto = limpiar_texto(texto)
+    texto = re.sub(r"[^\w\s-]", "", texto)
+    texto = re.sub(r"\s+", "_", texto)
+    return texto.upper() if texto else "DELEGACION"
+
 
 # =====================================================
 # EXTRACCIÓN SIGESS
@@ -180,12 +198,11 @@ def extraer_planificacion_sigess(archivo):
         engine="openpyxl"
     )
 
-    delegacion = limpiar_texto(df.iloc[2, 7]) if df.shape[0] > 2 and df.shape[1] > 7 else ""
-def nombre_archivo_seguro(texto):
-    texto = limpiar_texto(texto)
-    texto = re.sub(r"[^\w\s-]", "", texto)
-    texto = re.sub(r"\s+", "_", texto)
-    return texto.upper() if texto else "DELEGACION"
+    delegacion = (
+        limpiar_texto(df.iloc[2, 7])
+        if df.shape[0] > 2 and df.shape[1] > 7
+        else ""
+    )
 
     for i in range(len(df)):
         fila = df.iloc[i]
@@ -204,7 +221,11 @@ def nombre_archivo_seguro(texto):
             fila_fin_bloque = len(df)
 
             for k in range(i + 1, len(df)):
-                posible_siguiente = limpiar_texto(df.iloc[k, 3]) if df.shape[1] > 3 else ""
+                posible_siguiente = (
+                    limpiar_texto(df.iloc[k, 3])
+                    if df.shape[1] > 3
+                    else ""
+                )
 
                 if quitar_tildes(posible_siguiente).startswith("linea de accion"):
                     fila_fin_bloque = k
@@ -258,6 +279,7 @@ def nombre_archivo_seguro(texto):
 
     return pd.DataFrame(resultados)
 
+
 # =====================================================
 # COMPARACIÓN
 # =====================================================
@@ -270,8 +292,13 @@ def comparar_libros(df_base, df_final):
     claves_incorporadas = claves_final - claves_base
     claves_comunes = claves_base.intersection(claves_final)
 
-    no_localizados = df_base[df_base[COLUMNA_CLAVE].isin(claves_no_localizadas)].copy()
-    incorporados = df_final[df_final[COLUMNA_CLAVE].isin(claves_incorporadas)].copy()
+    no_localizados = df_base[
+        df_base[COLUMNA_CLAVE].isin(claves_no_localizadas)
+    ].copy()
+
+    incorporados = df_final[
+        df_final[COLUMNA_CLAVE].isin(claves_incorporadas)
+    ].copy()
 
     variaciones = []
 
@@ -316,7 +343,14 @@ def comparar_libros(df_base, df_final):
 # REPORTE EXCEL
 # =====================================================
 
-def generar_excel_reporte(df_base, df_final, no_localizados, incorporados, variaciones, resumen):
+def generar_excel_reporte(
+    df_base,
+    df_final,
+    no_localizados,
+    incorporados,
+    variaciones,
+    resumen
+):
     output = io.BytesIO()
 
     with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
@@ -328,7 +362,6 @@ def generar_excel_reporte(df_base, df_final, no_localizados, incorporados, varia
         variaciones.to_excel(writer, index=False, sheet_name="VARIACIONES")
 
         workbook = writer.book
-
         formato_header = workbook.add_format({
             "bold": True,
             "bg_color": "#1F4E79",
@@ -387,12 +420,6 @@ def limpiar_pdf(texto):
         "‘": "'",
         "’": "'",
         "•": "-",
-        "á": "á",
-        "é": "é",
-        "í": "í",
-        "ó": "ó",
-        "ú": "ú",
-        "ñ": "ñ",
     }
 
     for viejo, nuevo in reemplazos.items():
@@ -490,6 +517,7 @@ def generar_pdf_seguimiento(
     # =====================================================
     # PORTADA
     # =====================================================
+
     pdf.add_page()
     pdf.ln(18)
 
@@ -540,6 +568,7 @@ def generar_pdf_seguimiento(
     # =====================================================
     # OBJETO Y ALCANCE
     # =====================================================
+
     pdf.add_page()
     agregar_titulo_seccion(pdf, "1. Objeto del análisis")
     agregar_parrafo(pdf, datos_pdf["objeto_analisis"])
@@ -550,6 +579,7 @@ def generar_pdf_seguimiento(
     # =====================================================
     # RESUMEN EJECUTIVO
     # =====================================================
+
     pdf.add_page()
     agregar_titulo_seccion(pdf, "3. Resumen ejecutivo")
 
@@ -580,8 +610,9 @@ def generar_pdf_seguimiento(
     agregar_resumen_en_pdf(pdf, resumen)
 
     # =====================================================
-    # SI NO HAY DIFERENCIAS, PDF SIMPLIFICADO
+    # CUERPO DEL INFORME
     # =====================================================
+
     if informe_simplificado:
         pdf.add_page()
         agregar_titulo_seccion(pdf, "4. Resultado del seguimiento comparativo")
@@ -606,9 +637,6 @@ def generar_pdf_seguimiento(
         agregar_parrafo(pdf, datos_pdf["fuente_pdf"])
 
     else:
-        # =====================================================
-        # NO LOCALIZADOS
-        # =====================================================
         pdf.add_page()
         agregar_titulo_seccion(pdf, "4. Registros del Libro Base no localizados")
         agregar_parrafo(
@@ -623,9 +651,6 @@ def generar_pdf_seguimiento(
             max_filas=15
         )
 
-        # =====================================================
-        # INCORPORADOS
-        # =====================================================
         pdf.add_page()
         agregar_titulo_seccion(pdf, "5. Registros incorporados en el instrumento evaluado")
         agregar_parrafo(
@@ -640,9 +665,6 @@ def generar_pdf_seguimiento(
             max_filas=15
         )
 
-        # =====================================================
-        # VARIACIONES
-        # =====================================================
         pdf.add_page()
         agregar_titulo_seccion(pdf, "6. Variaciones identificadas")
         agregar_parrafo(
@@ -662,9 +684,6 @@ def generar_pdf_seguimiento(
             max_filas=15
         )
 
-        # =====================================================
-        # VALORACIÓN TÉCNICA
-        # =====================================================
         pdf.add_page()
         agregar_titulo_seccion(pdf, "7. Valoración técnica")
         agregar_parrafo(pdf, datos_pdf["texto_valoracion"])
@@ -675,6 +694,7 @@ def generar_pdf_seguimiento(
     # =====================================================
     # PÁGINA DE CIERRE
     # =====================================================
+
     pdf.add_page()
     pdf.ln(55)
 
@@ -734,12 +754,13 @@ if ejecutar:
     try:
         df_base = extraer_planificacion_sigess(archivo_base)
         df_final = extraer_planificacion_sigess(archivo_final)
+
         delegacion_reporte = "DELEGACION"
 
-if not df_final.empty and "Delegación Policial" in df_final.columns:
-    delegacion_reporte = nombre_archivo_seguro(
-        df_final["Delegación Policial"].iloc[0]
-    )
+        if not df_final.empty and "Delegación Policial" in df_final.columns:
+            delegacion_reporte = nombre_archivo_seguro(
+                df_final["Delegación Policial"].iloc[0]
+            )
 
         if df_base.empty:
             st.error("No se extrajo información válida del Libro Base 2025.")
@@ -755,7 +776,11 @@ if not df_final.empty and "Delegación Policial" in df_final.columns:
         total_final = len(df_final)
         total_no_localizados = len(no_localizados)
         total_incorporados = len(incorporados)
-        total_variaciones = variaciones["ID_REGISTRO"].nunique() if not variaciones.empty else 0
+        total_variaciones = (
+            variaciones["ID_REGISTRO"].nunique()
+            if not variaciones.empty
+            else 0
+        )
 
         claves_base = set(df_base[COLUMNA_CLAVE])
         claves_final = set(df_final[COLUMNA_CLAVE])
@@ -844,7 +869,7 @@ if not df_final.empty and "Delegación Policial" in df_final.columns:
             st.download_button(
                 label="📥 Descargar reporte Excel",
                 data=reporte_excel,
-               file_name=f"REPORTE_SEGUIMIENTO_{delegacion_reporte}_2026.xlsx"
+                file_name=f"REPORTE_SEGUIMIENTO_{delegacion_reporte}_2026.xlsx",
                 mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
             )
 
@@ -852,7 +877,7 @@ if not df_final.empty and "Delegación Policial" in df_final.columns:
             st.download_button(
                 label="📄 Descargar reporte PDF",
                 data=reporte_pdf,
-               file_name=f"INFORME_SEGUIMIENTO_{delegacion_reporte}_2026.pdf"
+                file_name=f"INFORME_SEGUIMIENTO_{delegacion_reporte}_2026.pdf",
                 mime="application/pdf"
             )
 
