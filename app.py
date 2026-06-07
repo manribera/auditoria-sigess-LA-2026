@@ -724,7 +724,7 @@ def generar_pdf_seguimiento(
 if "uploader_version" not in st.session_state:
     st.session_state["uploader_version"] = 0
 
-if st.button("🧹 Limpiar archivos cargados"):
+if st.button("Limpiar archivos cargados"):
     st.session_state["uploader_version"] += 1
     st.rerun()
 
@@ -744,7 +744,7 @@ with col2:
         key=f"final_{st.session_state['uploader_version']}"
     )
     
-ejecutar = st.button("🚀 Ejecutar Seguimiento Comparativo", type="primary")
+ejecutar = st.button("Ejecutar Seguimiento Comparativo", type="primary")
 
 # =====================================================
 # EJECUCIÓN
