@@ -20,7 +20,74 @@ st.write(
     "Compara un **Libro Base/Original** contra un **Libro Final 2026** "
     "detectando líneas, indicadores y metas eliminadas, nuevas o modificadas."
 )
+# =====================================================
+# PANEL EDITABLE DEL INFORME PDF
+# =====================================================
 
+with st.sidebar:
+    st.header("📝 Datos del informe")
+
+    elaborado_por = st.text_input(
+        "Realizado por",
+        value="",
+        placeholder="Nombre de quien realiza el informe"
+    )
+
+    fecha_emision = st.date_input("Fecha de emisión")
+
+    st.header("✏️ Textos editables del PDF")
+
+    titulo_pdf = st.text_input(
+        "Título del informe",
+        value="Informe de Seguimiento Comparativo de Líneas de Coordinación Estratégica"
+    )
+
+    subtitulo_pdf = st.text_input(
+        "Subtítulo",
+        value="Verificación de correspondencia metodológica entre el Libro Base 2025 y el Informe Trimestral de Avance 2026"
+    )
+
+    objeto_analisis = st.text_area(
+        "Objeto del análisis",
+        value=(
+            "El presente informe tiene como finalidad verificar la correspondencia metodológica "
+            "entre el Libro Base 2025 utilizado como referencia y el Informe Trimestral de Avance "
+            "evaluado, considerando las líneas de acción, indicadores, metas y demás elementos "
+            "asociados a la planificación estratégica."
+        ),
+        height=150
+    )
+
+    alcance_metodologico = st.text_area(
+        "Alcance metodológico",
+        value=(
+            "La revisión se realiza mediante una comparación estructurada entre ambos instrumentos, "
+            "identificando coincidencias, registros presentes en el Libro Base no localizados en el "
+            "instrumento evaluado, registros incorporados y variaciones en campos clave. "
+            "El resultado constituye un insumo técnico de seguimiento y no representa una auditoría "
+            "ni una valoración disciplinaria."
+        ),
+        height=170
+    )
+
+    texto_valoracion = st.text_area(
+        "Valoración técnica",
+        value=(
+            "Los resultados obtenidos permiten observar el grado de correspondencia entre la "
+            "planificación base y el instrumento trimestral evaluado. Las variaciones identificadas "
+            "deben ser revisadas en función del alcance metodológico definido para el seguimiento "
+            "de las Líneas de Coordinación Estratégica."
+        ),
+        height=150
+    )
+
+    fuente_pdf = st.text_area(
+        "Fuente",
+        value=(
+            "Fuente: Libro Base 2025 e Informe Trimestral de Avance de Líneas de Coordinación Estratégica 2026."
+        ),
+        height=80
+    )
 # =====================================================
 # CONFIGURACIÓN
 # =====================================================
