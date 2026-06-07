@@ -20,6 +20,16 @@ st.write(
     "Compara un **Libro Base/Original** contra un **Libro Final 2026** "
     "detectando líneas, indicadores y metas eliminadas, nuevas o modificadas."
 )
+datos_pdf = {
+    "elaborado_por": elaborado_por,
+    "fecha_emision": fecha_emision.strftime("%d/%m/%Y"),
+    "titulo_pdf": titulo_pdf,
+    "subtitulo_pdf": subtitulo_pdf,
+    "objeto_analisis": objeto_analisis,
+    "alcance_metodologico": alcance_metodologico,
+    "texto_valoracion": texto_valoracion,
+    "fuente_pdf": fuente_pdf,
+}
 # =====================================================
 # PANEL EDITABLE DEL INFORME PDF
 # =====================================================
