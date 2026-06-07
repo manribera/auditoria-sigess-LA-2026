@@ -46,7 +46,7 @@ st.write(
 # =====================================================
 
 with st.sidebar:
-    st.header("📝 Datos del informe")
+    st.header("Datos del informe")
 
     elaborado_por = st.text_input(
         "Realizado por",
@@ -59,7 +59,7 @@ with st.sidebar:
         value=date.today()
     )
 
-    st.header("✏️ Textos editables del PDF")
+    st.header("Textos editables del PDF")
 
     titulo_pdf = st.text_input(
         "Título del informe",
