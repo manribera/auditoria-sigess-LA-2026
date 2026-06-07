@@ -721,9 +721,11 @@ def generar_pdf_seguimiento(
 # =====================================================
 # INTERFAZ DE CARGA
 # =====================================================
-if st.button("Limpiar archivos cargados"):
-    st.session_state["base"] = None
-    st.session_state["final"] = None
+if "uploader_version" not in st.session_state:
+    st.session_state["uploader_version"] = 0
+
+if st.button("🧹 Limpiar archivos cargados"):
+    st.session_state["uploader_version"] += 1
     st.rerun()
 
 col1, col2 = st.columns(2)
@@ -732,18 +734,15 @@ with col1:
     archivo_base = st.file_uploader(
         "📘 Cargar Libro Base 2025",
         type=["xlsx", "xlsm"],
-        key="base"
+        key=f"base_{st.session_state['uploader_version']}"
     )
 
 with col2:
     archivo_final = st.file_uploader(
         "📗 Cargar Informe Trimestral 2026",
         type=["xlsx", "xlsm"],
-        key="final"
+        key=f"final_{st.session_state['uploader_version']}"
     )
-
-ejecutar = st.button("🚀 Ejecutar Seguimiento Comparativo", type="primary")
-
 
 # =====================================================
 # EJECUCIÓN
