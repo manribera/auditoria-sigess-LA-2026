@@ -3,33 +3,44 @@ import pandas as pd
 import io
 import re
 import unicodedata
+from datetime import date
+from fpdf import FPDF
+
+# =====================================================
+# CONFIGURACIÓN GENERAL
+# =====================================================
 
 st.set_page_config(
-    page_title="Auditoría SIGESS 2026",
+    page_title="Seguimiento SIGESS 2026",
     layout="wide"
 )
+
+HOJA_SIGESS = "Informe de avance"
+COLUMNA_CLAVE = "ID_REGISTRO"
+
+
+# =====================================================
+# ENCABEZADO
+# =====================================================
 
 col_logo, col_titulo = st.columns([1, 6])
 
 with col_logo:
-    st.image("man.png", width=90)
+    try:
+        st.image("man.png", width=90)
+    except Exception:
+        st.write("")
 
 with col_titulo:
-    st.title("Auditoría de Libros SIGESS 2026")
+    st.title("Seguimiento Comparativo SIGESS 2026")
+
 st.write(
-    "Compara un **Libro Base/Original** contra un **Libro Final 2026** "
-    "detectando líneas, indicadores y metas eliminadas, nuevas o modificadas."
+    "Herramienta para verificar la correspondencia metodológica entre el "
+    "**Libro Base 2025** y el **Informe Trimestral de Avance 2026**, "
+    "considerando líneas de acción, indicadores, metas y campos clave."
 )
-datos_pdf = {
-    "elaborado_por": elaborado_por,
-    "fecha_emision": fecha_emision.strftime("%d/%m/%Y"),
-    "titulo_pdf": titulo_pdf,
-    "subtitulo_pdf": subtitulo_pdf,
-    "objeto_analisis": objeto_analisis,
-    "alcance_metodologico": alcance_metodologico,
-    "texto_valoracion": texto_valoracion,
-    "fuente_pdf": fuente_pdf,
-}
+
+
 # =====================================================
 # PANEL EDITABLE DEL INFORME PDF
 # =====================================================
@@ -43,7 +54,10 @@ with st.sidebar:
         placeholder="Nombre de quien realiza el informe"
     )
 
-    fecha_emision = st.date_input("Fecha de emisión")
+    fecha_emision = st.date_input(
+        "Fecha de emisión",
+        value=date.today()
+    )
 
     st.header("✏️ Textos editables del PDF")
 
@@ -98,15 +112,17 @@ with st.sidebar:
         ),
         height=80
     )
-# =====================================================
-# CONFIGURACIÓN
-# =====================================================
 
-HOJA_SIGESS = "Informe de avance"
-
-# Esta será la clave principal de comparación.
-# Para SIGESS se recomienda usar este ID generado.
-COLUMNA_CLAVE = "ID_REGISTRO"
+datos_pdf = {
+    "elaborado_por": elaborado_por,
+    "fecha_emision": fecha_emision.strftime("%d/%m/%Y"),
+    "titulo_pdf": titulo_pdf,
+    "subtitulo_pdf": subtitulo_pdf,
+    "objeto_analisis": objeto_analisis,
+    "alcance_metodologico": alcance_metodologico,
+    "texto_valoracion": texto_valoracion,
+    "fuente_pdf": fuente_pdf,
+}
 
 
 # =====================================================
@@ -150,7 +166,6 @@ def extraer_numero_linea(texto):
 def crear_id_registro(delegacion, numero_linea, numero_indicador):
     delegacion = re.sub(r"\s+", "_", limpiar_texto(delegacion))
     delegacion = re.sub(r"[^A-Za-z0-9_ÁÉÍÓÚáéíóúÑñ]", "", delegacion)
-
     return f"{delegacion}_L{numero_linea}_I{numero_indicador}"
 
 
@@ -173,7 +188,6 @@ def extraer_planificacion_sigess(archivo):
         engine="openpyxl"
     )
 
-    # Delegación normalmente ubicada en fila 3, columna H
     delegacion = limpiar_texto(df.iloc[2, 7]) if df.shape[0] > 2 and df.shape[1] > 7 else ""
 
     for i in range(len(df)):
@@ -190,12 +204,9 @@ def extraer_planificacion_sigess(archivo):
 
             fila_inicio_indicadores = i + 4
 
-            # Buscar hasta antes de la siguiente línea de acción
             fila_fin_bloque = len(df)
-
             for k in range(i + 1, len(df)):
                 posible_siguiente = limpiar_texto(df.iloc[k, 3]) if df.shape[1] > 3 else ""
-
                 if quitar_tildes(posible_siguiente).startswith("linea de accion"):
                     fila_fin_bloque = k
                     break
@@ -211,7 +222,6 @@ def extraer_planificacion_sigess(archivo):
                 indicador = limpiar_texto(fila_ind[5]) if len(fila_ind) > 5 else ""
                 meta = limpiar_texto(fila_ind[7]) if len(fila_ind) > 7 else ""
 
-                # Evita filas vacías o encabezados
                 if not indicador and not meta:
                     continue
 
@@ -258,14 +268,14 @@ def comparar_libros(df_base, df_final):
     claves_base = set(df_base[COLUMNA_CLAVE])
     claves_final = set(df_final[COLUMNA_CLAVE])
 
-    claves_eliminadas = claves_base - claves_final
-    claves_nuevas = claves_final - claves_base
+    claves_no_localizadas = claves_base - claves_final
+    claves_incorporadas = claves_final - claves_base
     claves_comunes = claves_base.intersection(claves_final)
 
-    eliminados = df_base[df_base[COLUMNA_CLAVE].isin(claves_eliminadas)].copy()
-    nuevos = df_final[df_final[COLUMNA_CLAVE].isin(claves_nuevas)].copy()
+    no_localizados = df_base[df_base[COLUMNA_CLAVE].isin(claves_no_localizadas)].copy()
+    incorporados = df_final[df_final[COLUMNA_CLAVE].isin(claves_incorporadas)].copy()
 
-    modificaciones = []
+    variaciones = []
 
     columnas_comparar = [
         "Delegación Policial",
@@ -296,53 +306,321 @@ def comparar_libros(df_base, df_final):
             valor_final = limpiar_texto(fila_final.get(col, ""))
 
             if valor_base != valor_final:
-                modificaciones.append({
+                variaciones.append({
                     "ID_REGISTRO": clave,
-                    "Campo Modificado": col,
-                    "Valor Libro Base": valor_base,
-                    "Valor Libro Final 2026": valor_final
+                    "Campo con variación": col,
+                    "Valor Libro Base 2025": valor_base,
+                    "Valor Informe Evaluado 2026": valor_final
                 })
 
-    df_modificaciones = pd.DataFrame(modificaciones)
+    df_variaciones = pd.DataFrame(variaciones)
 
-    return eliminados, nuevos, df_modificaciones
+    return no_localizados, incorporados, df_variaciones
 
 
-def generar_excel_reporte(df_base, df_final, eliminados, nuevos, modificaciones, resumen):
+# =====================================================
+# REPORTE EXCEL
+# =====================================================
+
+def generar_excel_reporte(df_base, df_final, no_localizados, incorporados, variaciones, resumen):
     output = io.BytesIO()
 
-    with pd.ExcelWriter(output, engine="openpyxl") as writer:
+    with pd.ExcelWriter(output, engine="xlsxwriter") as writer:
         resumen.to_excel(writer, index=False, sheet_name="RESUMEN")
-        df_base.to_excel(writer, index=False, sheet_name="BASE_EXTRAIDA")
-        df_final.to_excel(writer, index=False, sheet_name="FINAL_EXTRAIDO")
-        eliminados.to_excel(writer, index=False, sheet_name="ELIMINADOS")
-        nuevos.to_excel(writer, index=False, sheet_name="NUEVOS")
-        modificaciones.to_excel(writer, index=False, sheet_name="MODIFICACIONES")
+        df_base.to_excel(writer, index=False, sheet_name="BASE_2025_EXTRAIDA")
+        df_final.to_excel(writer, index=False, sheet_name="INFORME_2026_EXTRAIDO")
+        no_localizados.to_excel(writer, index=False, sheet_name="NO_LOCALIZADOS")
+        incorporados.to_excel(writer, index=False, sheet_name="INCORPORADOS")
+        variaciones.to_excel(writer, index=False, sheet_name="VARIACIONES")
+
+        workbook = writer.book
+
+        formato_header = workbook.add_format({
+            "bold": True,
+            "bg_color": "#1F4E79",
+            "font_color": "white",
+            "border": 1
+        })
+
+        for sheet_name in writer.sheets:
+            worksheet = writer.sheets[sheet_name]
+            worksheet.freeze_panes(1, 0)
+            worksheet.autofilter(0, 0, 0, 10)
+
+            for col_num, value in enumerate(writer.sheets[sheet_name].table.columns if False else []):
+                pass
+
+        for nombre_hoja, dataframe in {
+            "RESUMEN": resumen,
+            "BASE_2025_EXTRAIDA": df_base,
+            "INFORME_2026_EXTRAIDO": df_final,
+            "NO_LOCALIZADOS": no_localizados,
+            "INCORPORADOS": incorporados,
+            "VARIACIONES": variaciones,
+        }.items():
+            ws = writer.sheets[nombre_hoja]
+
+            for col_num, value in enumerate(dataframe.columns.values):
+                ws.write(0, col_num, value, formato_header)
+                ws.set_column(col_num, col_num, 25)
 
     return output.getvalue()
 
 
 # =====================================================
-# INTERFAZ
+# REPORTE PDF
+# =====================================================
+
+class PDFSeguimiento(FPDF):
+    def header(self):
+        self.set_font("Helvetica", "B", 9)
+        self.set_text_color(80, 80, 80)
+        self.cell(0, 8, "Seguimiento Comparativo SIGESS 2026", align="R", ln=True)
+        self.ln(3)
+
+    def footer(self):
+        self.set_y(-15)
+        self.set_font("Helvetica", "", 8)
+        self.set_text_color(120, 120, 120)
+        self.cell(0, 10, f"Página {self.page_no()}", align="C")
+
+
+def limpiar_pdf(texto):
+    texto = limpiar_texto(texto)
+    reemplazos = {
+        "–": "-",
+        "—": "-",
+        "“": '"',
+        "”": '"',
+        "‘": "'",
+        "’": "'",
+        "•": "-",
+    }
+
+    for viejo, nuevo in reemplazos.items():
+        texto = texto.replace(viejo, nuevo)
+
+    return texto
+
+
+def agregar_titulo_seccion(pdf, titulo):
+    pdf.set_font("Helvetica", "B", 14)
+    pdf.set_text_color(31, 78, 121)
+    pdf.multi_cell(0, 8, limpiar_pdf(titulo))
+    pdf.ln(3)
+
+
+def agregar_parrafo(pdf, texto):
+    pdf.set_font("Helvetica", "", 10)
+    pdf.set_text_color(40, 40, 40)
+    pdf.multi_cell(0, 6, limpiar_pdf(texto))
+    pdf.ln(4)
+
+
+def agregar_tabla_simple(pdf, df, columnas, max_filas=12):
+    if df.empty:
+        pdf.set_font("Helvetica", "I", 10)
+        pdf.set_text_color(80, 80, 80)
+        pdf.cell(0, 8, "No se registran datos en esta sección.", ln=True)
+        pdf.ln(4)
+        return
+
+    df_mostrar = df[columnas].head(max_filas).copy()
+
+    pdf.set_font("Helvetica", "B", 8)
+    pdf.set_fill_color(31, 78, 121)
+    pdf.set_text_color(255, 255, 255)
+
+    ancho_total = 190
+    ancho_col = ancho_total / len(columnas)
+
+    for col in columnas:
+        pdf.cell(ancho_col, 7, limpiar_pdf(str(col))[:25], border=1, fill=True)
+    pdf.ln()
+
+    pdf.set_font("Helvetica", "", 7)
+    pdf.set_text_color(40, 40, 40)
+
+    for _, row in df_mostrar.iterrows():
+        for col in columnas:
+            valor = limpiar_pdf(row.get(col, ""))
+            pdf.cell(ancho_col, 7, valor[:35], border=1)
+        pdf.ln()
+
+    if len(df) > max_filas:
+        pdf.ln(2)
+        pdf.set_font("Helvetica", "I", 8)
+        pdf.cell(0, 6, f"Se muestran {max_filas} registros de {len(df)}. Ver detalle completo en el Excel anexo.", ln=True)
+
+    pdf.ln(5)
+
+
+def generar_pdf_seguimiento(
+    datos_pdf,
+    resumen,
+    df_base,
+    df_final,
+    no_localizados,
+    incorporados,
+    variaciones
+):
+    pdf = PDFSeguimiento()
+    pdf.set_auto_page_break(auto=True, margin=18)
+
+    # Portada
+    pdf.add_page()
+    pdf.ln(25)
+
+    pdf.set_font("Helvetica", "B", 20)
+    pdf.set_text_color(31, 78, 121)
+    pdf.multi_cell(0, 10, limpiar_pdf(datos_pdf["titulo_pdf"]), align="C")
+
+    pdf.ln(5)
+    pdf.set_font("Helvetica", "", 12)
+    pdf.set_text_color(70, 70, 70)
+    pdf.multi_cell(0, 8, limpiar_pdf(datos_pdf["subtitulo_pdf"]), align="C")
+
+    pdf.ln(18)
+
+    delegacion = ""
+    if not df_final.empty and "Delegación Policial" in df_final.columns:
+        delegacion = limpiar_texto(df_final["Delegación Policial"].iloc[0])
+
+    pdf.set_font("Helvetica", "", 11)
+    pdf.cell(0, 8, f"Delegación: {limpiar_pdf(delegacion)}", ln=True)
+    pdf.cell(0, 8, f"Fecha de emisión: {datos_pdf['fecha_emision']}", ln=True)
+    pdf.cell(0, 8, f"Realizado por: {limpiar_pdf(datos_pdf['elaborado_por'])}", ln=True)
+
+    pdf.ln(20)
+    pdf.set_font("Helvetica", "I", 10)
+    pdf.multi_cell(
+        0,
+        6,
+        limpiar_pdf(
+            "Documento técnico generado para apoyar el seguimiento comparativo "
+            "de la estructura de líneas de coordinación estratégica."
+        ),
+        align="C"
+    )
+
+    # Objeto y alcance
+    pdf.add_page()
+    agregar_titulo_seccion(pdf, "1. Objeto del análisis")
+    agregar_parrafo(pdf, datos_pdf["objeto_analisis"])
+
+    agregar_titulo_seccion(pdf, "2. Alcance metodológico")
+    agregar_parrafo(pdf, datos_pdf["alcance_metodologico"])
+
+    # Resumen
+    pdf.add_page()
+    agregar_titulo_seccion(pdf, "3. Resumen ejecutivo")
+
+    total_base = int(resumen["Total registros Libro Base 2025"].iloc[0])
+    total_final = int(resumen["Total registros Informe Evaluado 2026"].iloc[0])
+    total_iguales = int(resumen["Registros coincidentes"].iloc[0])
+    total_no_localizados = int(resumen["Registros no localizados"].iloc[0])
+    total_incorporados = int(resumen["Registros incorporados"].iloc[0])
+    total_variaciones = int(resumen["Registros con variaciones"].iloc[0])
+
+    texto_resumen = (
+        f"Se procesaron {total_base} registros del Libro Base 2025 y "
+        f"{total_final} registros del Informe Trimestral de Avance 2026. "
+        f"Como resultado, se identificaron {total_iguales} registros coincidentes, "
+        f"{total_no_localizados} registros no localizados en el instrumento evaluado, "
+        f"{total_incorporados} registros incorporados y "
+        f"{total_variaciones} registros con variaciones en campos clave."
+    )
+
+    agregar_parrafo(pdf, texto_resumen)
+
+    agregar_tabla_simple(
+        pdf,
+        resumen,
+        list(resumen.columns),
+        max_filas=5
+    )
+
+    # No localizados
+    pdf.add_page()
+    agregar_titulo_seccion(pdf, "4. Registros del Libro Base no localizados")
+    agregar_parrafo(
+        pdf,
+        "Esta sección muestra registros presentes en el Libro Base 2025 que no fueron localizados "
+        "en el Informe Trimestral de Avance evaluado."
+    )
+    agregar_tabla_simple(
+        pdf,
+        no_localizados,
+        ["Número de Línea", "Indicador", "Meta"],
+        max_filas=15
+    )
+
+    # Incorporados
+    pdf.add_page()
+    agregar_titulo_seccion(pdf, "5. Registros incorporados en el instrumento evaluado")
+    agregar_parrafo(
+        pdf,
+        "Esta sección muestra registros presentes en el Informe Trimestral de Avance 2026 "
+        "que no se encontraban en el Libro Base 2025 utilizado como referencia."
+    )
+    agregar_tabla_simple(
+        pdf,
+        incorporados,
+        ["Número de Línea", "Indicador", "Meta"],
+        max_filas=15
+    )
+
+    # Variaciones
+    pdf.add_page()
+    agregar_titulo_seccion(pdf, "6. Variaciones identificadas")
+    agregar_parrafo(
+        pdf,
+        "Esta sección muestra diferencias observadas en campos clave de registros localizados "
+        "en ambos instrumentos."
+    )
+    agregar_tabla_simple(
+        pdf,
+        variaciones,
+        ["ID_REGISTRO", "Campo con variación", "Valor Libro Base 2025", "Valor Informe Evaluado 2026"],
+        max_filas=15
+    )
+
+    # Valoración técnica
+    pdf.add_page()
+    agregar_titulo_seccion(pdf, "7. Valoración técnica")
+    agregar_parrafo(pdf, datos_pdf["texto_valoracion"])
+
+    agregar_titulo_seccion(pdf, "8. Fuente")
+    agregar_parrafo(pdf, datos_pdf["fuente_pdf"])
+
+    pdf_bytes = pdf.output(dest="S")
+    if isinstance(pdf_bytes, str):
+        pdf_bytes = pdf_bytes.encode("latin-1")
+
+    return pdf_bytes
+
+
+# =====================================================
+# INTERFAZ DE CARGA
 # =====================================================
 
 col1, col2 = st.columns(2)
 
 with col1:
     archivo_base = st.file_uploader(
-        "📘 Cargar Libro Base / Original",
+        "📘 Cargar Libro Base 2025",
         type=["xlsx", "xlsm"],
         key="base"
     )
 
 with col2:
     archivo_final = st.file_uploader(
-        "📗 Cargar Libro Final 2026",
+        "📗 Cargar Informe Trimestral 2026",
         type=["xlsx", "xlsm"],
         key="final"
     )
 
-ejecutar = st.button("🚀 Ejecutar Auditoría SIGESS", type="primary")
+ejecutar = st.button("🚀 Ejecutar Seguimiento Comparativo", type="primary")
 
 
 # =====================================================
@@ -352,7 +630,7 @@ ejecutar = st.button("🚀 Ejecutar Auditoría SIGESS", type="primary")
 if ejecutar:
 
     if not archivo_base or not archivo_final:
-        st.warning("Debes cargar ambos libros para ejecutar la auditoría.")
+        st.warning("Debes cargar ambos libros para ejecutar el seguimiento.")
         st.stop()
 
     try:
@@ -360,125 +638,119 @@ if ejecutar:
         df_final = extraer_planificacion_sigess(archivo_final)
 
         if df_base.empty:
-            st.error("No se extrajo información válida del Libro Base.")
+            st.error("No se extrajo información válida del Libro Base 2025.")
             st.stop()
 
         if df_final.empty:
-            st.error("No se extrajo información válida del Libro Final 2026.")
+            st.error("No se extrajo información válida del Informe Trimestral 2026.")
             st.stop()
 
-        eliminados, nuevos, modificaciones = comparar_libros(df_base, df_final)
+        no_localizados, incorporados, variaciones = comparar_libros(df_base, df_final)
 
         total_base = len(df_base)
         total_final = len(df_final)
-        total_eliminados = len(eliminados)
-        total_nuevos = len(nuevos)
-        total_modificados = modificaciones["ID_REGISTRO"].nunique() if not modificaciones.empty else 0
+        total_no_localizados = len(no_localizados)
+        total_incorporados = len(incorporados)
+        total_variaciones = variaciones["ID_REGISTRO"].nunique() if not variaciones.empty else 0
 
         claves_base = set(df_base[COLUMNA_CLAVE])
         claves_final = set(df_final[COLUMNA_CLAVE])
         total_comunes = len(claves_base.intersection(claves_final))
-        total_iguales = total_comunes - total_modificados
+        total_coincidentes = total_comunes - total_variaciones
 
         resumen = pd.DataFrame([{
-            "Total indicadores Libro Base": total_base,
-            "Total indicadores Libro Final 2026": total_final,
-            "Indicadores iguales": total_iguales,
-            "Indicadores eliminados": total_eliminados,
-            "Indicadores nuevos": total_nuevos,
-            "Indicadores modificados": total_modificados
+            "Total registros Libro Base 2025": total_base,
+            "Total registros Informe Evaluado 2026": total_final,
+            "Registros coincidentes": total_coincidentes,
+            "Registros no localizados": total_no_localizados,
+            "Registros incorporados": total_incorporados,
+            "Registros con variaciones": total_variaciones
         }])
 
-        st.success("Auditoría ejecutada correctamente.")
+        st.success("Seguimiento comparativo ejecutado correctamente.")
 
         m1, m2, m3, m4, m5, m6 = st.columns(6)
 
-        m1.metric("Base", total_base)
-        m2.metric("Final 2026", total_final)
-        m3.metric("Iguales", total_iguales)
-        m4.metric("Eliminados ❌", total_eliminados)
-        m5.metric("Nuevos ➕", total_nuevos)
-        m6.metric("Modificados ⚠️", total_modificados)
-
-        if total_eliminados > 0:
-            st.error(f"Se detectaron {total_eliminados} indicadores/líneas eliminadas del Libro Final 2026.")
-
-        if total_nuevos > 0:
-            st.info(f"Se detectaron {total_nuevos} indicadores/líneas nuevas agregadas.")
-
-        if total_modificados > 0:
-            st.warning(f"Se detectaron modificaciones en {total_modificados} registros existentes.")
+        m1.metric("Base 2025", total_base)
+        m2.metric("Informe 2026", total_final)
+        m3.metric("Coincidentes", total_coincidentes)
+        m4.metric("No localizados", total_no_localizados)
+        m5.metric("Incorporados", total_incorporados)
+        m6.metric("Con variaciones", total_variaciones)
 
         tab1, tab2, tab3, tab4, tab5 = st.tabs([
-            "Eliminados sospechosos ❌",
-            "Nuevos agregados ➕",
-            "Modificaciones ⚠️",
-            "Base extraída 📘",
-            "Final extraído 📗"
+            "No localizados",
+            "Incorporados",
+            "Variaciones",
+            "Base 2025 extraída",
+            "Informe 2026 extraído"
         ])
 
         with tab1:
-            st.subheader("❌ Indicadores o líneas eliminadas")
-            if eliminados.empty:
-                st.success("No se detectaron eliminaciones.")
+            st.subheader("Registros del Libro Base no localizados")
+            if no_localizados.empty:
+                st.success("No se registran elementos no localizados.")
             else:
-                st.dataframe(
-                    eliminados.style.apply(
-                        lambda row: ["background-color: #ffcccc"] * len(row),
-                        axis=1
-                    ),
-                    use_container_width=True
-                )
+                st.dataframe(no_localizados, use_container_width=True)
 
         with tab2:
-            st.subheader("➕ Indicadores o líneas nuevas")
-            if nuevos.empty:
-                st.success("No se detectaron nuevos registros.")
+            st.subheader("Registros incorporados")
+            if incorporados.empty:
+                st.success("No se registran elementos incorporados.")
             else:
-                st.dataframe(
-                    nuevos.style.apply(
-                        lambda row: ["background-color: #d9ead3"] * len(row),
-                        axis=1
-                    ),
-                    use_container_width=True
-                )
+                st.dataframe(incorporados, use_container_width=True)
 
         with tab3:
-            st.subheader("⚠️ Modificaciones detectadas")
-            if modificaciones.empty:
-                st.success("No se detectaron modificaciones.")
+            st.subheader("Variaciones identificadas")
+            if variaciones.empty:
+                st.success("No se registran variaciones.")
             else:
-                st.dataframe(
-                    modificaciones.style.apply(
-                        lambda row: ["background-color: #fff2cc"] * len(row),
-                        axis=1
-                    ),
-                    use_container_width=True
-                )
+                st.dataframe(variaciones, use_container_width=True)
 
         with tab4:
-            st.subheader("📘 Planificación extraída del Libro Base")
+            st.subheader("Planificación extraída del Libro Base 2025")
             st.dataframe(df_base, use_container_width=True)
 
         with tab5:
-            st.subheader("📗 Planificación extraída del Libro Final 2026")
+            st.subheader("Planificación extraída del Informe Trimestral 2026")
             st.dataframe(df_final, use_container_width=True)
 
-        reporte = generar_excel_reporte(
+        reporte_excel = generar_excel_reporte(
             df_base,
             df_final,
-            eliminados,
-            nuevos,
-            modificaciones,
+            no_localizados,
+            incorporados,
+            variaciones,
             resumen
         )
 
-        st.download_button(
-            label="📥 Descargar Reporte de Auditoría SIGESS",
-            data=reporte,
-            file_name="REPORTE_AUDITORIA_SIGESS_2026.xlsx",
-            mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+        reporte_pdf = generar_pdf_seguimiento(
+            datos_pdf,
+            resumen,
+            df_base,
+            df_final,
+            no_localizados,
+            incorporados,
+            variaciones
         )
 
+        col_descarga1, col_descarga2 = st.columns(2)
+
+        with col_descarga1:
+            st.download_button(
+                label="📥 Descargar reporte Excel",
+                data=reporte_excel,
+                file_name="REPORTE_SEGUIMIENTO_COMPARATIVO_SIGESS_2026.xlsx",
+                mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+            )
+
+        with col_descarga2:
+            st.download_button(
+                label="📄 Descargar reporte PDF",
+                data=reporte_pdf,
+                file_name="INFORME_SEGUIMIENTO_COMPARATIVO_SIGESS_2026.pdf",
+                mime="application/pdf"
+            )
+
     except Exception as e:
-        st.error(f"Error durante la auditoría: {e}")
+        st.error(f"Error durante el seguimiento comparativo: {e}")
